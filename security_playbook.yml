@@ -1,0 +1,66 @@
+---
+
+- name: Install and Configure Security tools
+  hosts: security
+  become: yes
+
+  tasks:
+    - name: Update the apt caches and upgrade the packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install security-related packages
+      apt:
+        name:
+          - ufw # For uncomplicated firewall
+          - fail2ban # Intrusion prevention system
+          - aide # checking for the integrity of the file
+          - logwatch # log analysis and reporting
+        state: latest
+
+    - name: Configure UFW
+      ufw:
+        rule: allow
+        port: " {{ item }}"
+      loop:
+        - 22 # for ssh
+        - 80 # for http
+        - 443 # for https
+      notify: Restart UFW
+
+    - name: Enable UFW logging
+      ufw:
+        logging: full
+
+    - name: Configure fail2ban
+      copy:
+        src: /etc/fail2ban/jail.local
+        dest: /etc/fail2ban/fail2ban.conf
+      notify: Restart fail2ban
+
+    - name: Configure AIDE
+      copy:
+        src: /etc/aide/aide.conf
+        dest: /etc/aide/aide.conf
+      notify: Initialize AIDE Database
+
+    - name: Configure Logwatch
+      copy:
+        src: /etc/logwatch/conf/logwatch.conf
+        dest: /etc/logwatch/conf/logwatch.conf
+
+  handlers:
+    - name: Restart UFW
+      service:
+        name: ufw
+        state: restarted
+        
+    - name: Restart fail2ban
+      service:
+        name: fail2ban
+        state: restarted
+
+    - name: Initialize AIDE database
+      command: aideinit
+      changed_when: false
